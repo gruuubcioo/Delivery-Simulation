@@ -18,7 +18,7 @@
 #define MAGAZINES 3
 #define SHM_SIZE 1024
 
-#define MAGAZINE_NUMBER 2
+#define MAGAZINE_NUMBER 0
 
 // to jako argumenty
 #define KEY 5555
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
         data->magazines[MAGAZINE_NUMBER].courier_active[i] = 1;
     }
 
-    int fd = open("mag2.txt", O_RDONLY);
+    int fd = open("mag0.txt", O_RDONLY);
     if (fd == -1) {
         perror("open");
         exit(1);
