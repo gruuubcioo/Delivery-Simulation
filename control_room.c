@@ -19,13 +19,6 @@
 #define SEM_KEY 6666
 #define MEMORY_FREE 0
 
-// to jako argumenty
-#define KEY 5555
-#define LICZBA_ZAMOWIEN 20
-#define MAX_A 5
-#define MAX_B 10
-#define MAX_C 15
-
 struct magazine {
     int magazine_gold;
     int courier_active[COURIERS];
@@ -43,6 +36,7 @@ struct shared_data {
     struct magazine magazines[MAGAZINES];
     struct control_room ctrl_room;
     int sem_ready;
+    int mag_count;
 };
 
 struct order_info {
@@ -57,19 +51,31 @@ struct msgbuf {
 
 int main(int argc, char* argv[]) {
 
+    if (argc != 6) {
+        printf("Niepoprawna liczba argumentow\n");
+        exit(1);
+    }
+    for (int i = 1; i < 6; i++) {
+        if (atoi(argv[i]) <= 0) {
+            printf("Podaj liczbe dodatnią całkowitą\n");
+            exit(1);
+        }
+    }
+
     srand(time(NULL));
 
-    int msgid = msgget(KEY, 0666 | IPC_CREAT);
+    int msgid = msgget(atoi(argv[1]), 0666 | IPC_CREAT);
     int a = 0;
     int b = 0;
     int c = 0;
     struct msgbuf message;
     message.mtype = 1;
 
-    int shmid = shmget(KEY, SHM_SIZE, 0666 | IPC_CREAT);
+    int shmid = shmget(atoi(argv[1]), SHM_SIZE, 0666 | IPC_CREAT);
     struct shared_data* data = (struct shared_data*)shmat(shmid, NULL, 0);
     int semid = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
     semctl(semid, MEMORY_FREE, SETVAL, 1);
+    data->mag_count = 0;
     data->sem_ready = 1;
     
     struct sembuf memory_lock = {MEMORY_FREE, -1, 0};
@@ -85,14 +91,14 @@ int main(int argc, char* argv[]) {
     int min_sleep = 25000; // 0.025s
     int max_sleep = 500000; // 0.5 s
 
-    for (int i = 0; i < LICZBA_ZAMOWIEN; i++) {
+    for (int i = 0; i < atoi(argv[2]); i++) {
 
         int sleeping_time = rand() % (max_sleep - min_sleep + 1) + min_sleep;
         usleep(sleeping_time);
 
-        a = (rand() % (MAX_A + 1));
-        b = (rand() % (MAX_B + 1));
-        c = (rand() % (MAX_C + 1));
+        a = (rand() % (atoi(argv[3]) + 1));
+        b = (rand() % (atoi(argv[4]) + 1));
+        c = (rand() % (atoi(argv[5]) + 1));
 
         message.order.product[0] = a;
         message.order.product[1] = b;
@@ -120,7 +126,7 @@ int main(int argc, char* argv[]) {
     printf("\n======================================================\n");
     printf("Stan dyspozytorni:\n");
     printf("Gold: %d\n", data->ctrl_room.control_room_gold);
-    printf("======================================================\n");
+    printf("======================================================\n\n");
 
     msgctl(msgid, IPC_RMID, NULL);
     printf("Kolejka usunieta\n");

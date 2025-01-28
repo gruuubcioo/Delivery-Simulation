@@ -23,11 +23,6 @@
 #define SEM_KEY 6666
 #define MEMORY_FREE 0
 
-#define MAGAZINE_NUMBER 1
-
-// to jako argumenty
-#define KEY 5555
-
 struct magazine {
     int magazine_gold;
     int courier_active[COURIERS];
@@ -45,6 +40,7 @@ struct shared_data {
     struct magazine magazines[MAGAZINES];
     struct control_room ctrl_room;
     int sem_ready;
+    int mag_count;
 };
 
 struct order_info {
@@ -59,12 +55,22 @@ struct msgbuf {
 
 int main(int argc, char* argv[]) {
 
+    if (argc != 3) {
+        printf("Niepoprawna liczba argumentow\n");
+        exit(1);
+    }
+    int key = atoi(argv[2]);
+    if (key <= 0) {
+        printf("Podaj liczbe dodatnią całkowitą\n");
+        exit(1);
+    }
+
     srand(time(NULL));
 
-    int msgid = msgget(KEY, 0666 | IPC_CREAT);
+    int msgid = msgget(key, 0666 | IPC_CREAT);
     struct msgbuf message;
 
-    int shmid = shmget(KEY, SHM_SIZE, 0666 | IPC_CREAT);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
     struct shared_data* data = (struct shared_data*)shmat(shmid, NULL, 0);
 
     int semid = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
@@ -74,6 +80,11 @@ int main(int argc, char* argv[]) {
     while (!data->sem_ready) {
         usleep(100000);
     }
+
+    semop(semid, &memory_lock, 1);
+    const int MAGAZINE_NUMBER = data->mag_count;
+    data->mag_count++;
+    semop(semid, &memory_unlock, 1);
 
     int pids[COURIERS];
     int current_courier = -1;
@@ -89,10 +100,14 @@ int main(int argc, char* argv[]) {
 
     semop(semid, &memory_unlock, 1);
 
-    int fd = open("mag1.txt", O_RDONLY);
+    int fd = open(argv[1], O_RDONLY);
     if (fd == -1) {
         perror("open");
-        exit(1);
+        for (int i = 0; i < COURIERS; i++) {
+            semop(semid, &memory_lock, 1);
+            data->magazines[MAGAZINE_NUMBER].courier_active[i] = 0;
+            semop(semid, &memory_unlock, 1);
+        }
     }
     char buf[1];
     int bytes_read;
@@ -114,10 +129,25 @@ int main(int argc, char* argv[]) {
         } else {
             printf("Invalid values in file\n");
             close(fd);
-            exit(1);
+            for (int i = 0; i < COURIERS; i++) {
+                semop(semid, &memory_lock, 1);
+                data->magazines[MAGAZINE_NUMBER].courier_active[i] = 0;
+                semop(semid, &memory_unlock, 1);
+            }
         }
     }
     close(fd);
+
+    for (int i = 0; i < (2 * PRODUCT); i++) {
+        if (tmp[i] == 0) {
+            for (int i = 0; i < COURIERS; i++) {
+                semop(semid, &memory_lock, 1);
+                data->magazines[MAGAZINE_NUMBER].courier_active[i] = 0;
+                semop(semid, &memory_unlock, 1);
+            }
+            break;
+        }
+    }
 
     semop(semid, &memory_lock, 1);
 
@@ -195,14 +225,12 @@ int main(int argc, char* argv[]) {
         printf("Produkt %c: %d\n", (char)('A' + i), data->magazines[MAGAZINE_NUMBER].product_number[i]);
     }
     printf("Gold: %d\n", data->magazines[MAGAZINE_NUMBER].magazine_gold);
-    printf("======================================================\n");
+    printf("======================================================\n\n");
 
     semop(semid, &memory_unlock, 1);
 
     shmdt(data);
     printf("Memory detached\n");
-    shmctl(shmid, IPC_RMID, NULL);
-    printf("Memory marked to delete\n");
 
     return 0;
 }
