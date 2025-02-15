@@ -16,7 +16,7 @@ To compile all modules:
     gcc warehouse.c -o warehouse
 ```
 
-To execute:
+To execute (3 warehouses on 3 terminals by deafult):
 
 ```sh
     ./control_room <ipc_key> <order_count> <max_A> <max_B> <max_C>
