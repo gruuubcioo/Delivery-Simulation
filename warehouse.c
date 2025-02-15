@@ -12,7 +12,6 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <time.h>
 #include <sys/sem.h>
 
 #define COURIERS 3
@@ -56,12 +55,12 @@ struct msgbuf {
 int main(int argc, char* argv[]) {
 
     if (argc != 3) {
-        printf("Niepoprawna liczba argumentow\n");
+        printf("Invalid argument number\n");
         exit(1);
     }
     int key = atoi(argv[2]);
     if (key <= 0) {
-        printf("Podaj liczbe dodatnią całkowitą\n");
+        printf("Enter a positive integer\n");
         exit(1);
     }
 
@@ -86,18 +85,13 @@ int main(int argc, char* argv[]) {
     data->mag_count++;
     semop(semid, &memory_unlock, 1);
 
-    int pids[COURIERS];
-    int current_courier = -1;
-
     semop(semid, &memory_lock, 1);
-
     data->magazines[MAGAZINE_NUMBER].magazine_active = 1;
     data->magazines[MAGAZINE_NUMBER].magazine_gold = 0;
     data->ctrl_room.control_room_gold = 0;
     for (int i = 0; i < COURIERS; i++) {
         data->magazines[MAGAZINE_NUMBER].courier_active[i] = 1;
     }
-
     semop(semid, &memory_unlock, 1);
 
     int fd = open(argv[1], O_RDONLY);
@@ -150,16 +144,16 @@ int main(int argc, char* argv[]) {
     }
 
     semop(semid, &memory_lock, 1);
-
     for (int i = 0; i < PRODUCT; i++) {
         data->magazines[MAGAZINE_NUMBER].product_number[i] = tmp[i];
         data->magazines[MAGAZINE_NUMBER].product_cost[i] = tmp[i + PRODUCT];
         // printf("%d\n", data->magazines[MAGAZINE_NUMBER].product_number[i]);
         // printf("%d\n", data->magazines[MAGAZINE_NUMBER].product_cost[i]);
     }
-
     semop(semid, &memory_unlock, 1);
 
+    int pids[COURIERS];
+    int current_courier = -1;
     for (int i = 0; i < COURIERS; i++) {
         pids[i] = fork();
         current_courier++;
@@ -178,10 +172,9 @@ int main(int argc, char* argv[]) {
                 current_time = time(NULL);
                 if (difftime(current_time, last_order_time) > WAITING_TIME) {
                     data->magazines[MAGAZINE_NUMBER].courier_active[i] = 0;
-                    printf("Kurier %d magazynu %d wyłącza się po %d sekundach bez zlecenia\n", i, MAGAZINE_NUMBER, WAITING_TIME);
+                    printf("Courier %d, from warehouse, %d turned off after %d seconds without an order\n", i, MAGAZINE_NUMBER, WAITING_TIME);
                     exit(0);
                 }
-
 
                 if (msgrcv(msgid, &message, sizeof(struct order_info), 1, IPC_NOWAIT) > 0) {
                     last_order_time = time(NULL);
@@ -189,14 +182,13 @@ int main(int argc, char* argv[]) {
                         message.order.product[1] > data->magazines[MAGAZINE_NUMBER].product_number[1] ||
                         message.order.product[2] > data->magazines[MAGAZINE_NUMBER].product_number[2]) {
                             data->magazines[MAGAZINE_NUMBER].courier_active[i] = 0;
-                            printf("Kurier %d, magazynu %d, wylacza sie z powodu braku zasobow(zamowienie %d)\n", i, MAGAZINE_NUMBER, message.order.order_number);
+                            printf("Courier %d, from warehouse %d, turns off due to lack of resources (order %d)\n", i, MAGAZINE_NUMBER, message.order.order_number);
                     } else {
-                        printf("Kurier %d, magazynu %d, przyjął zamówienie numer %d, na %dxA, %dxB, %dxC\n", 
+                        printf("Courier %d, from warehouse %d, accepted order number %d, for %dxA, %dxB, %dxC\n", 
                         i, MAGAZINE_NUMBER, message.order.order_number, message.order.product[0],
                         message.order.product[1], message.order.product[2]);
 
                         semop(semid, &memory_lock, 1);
-
                         for (int j = 0; j < PRODUCT; j++) {
                             data->magazines[MAGAZINE_NUMBER].product_number[j] -= message.order.product[j];
                             gold = message.order.product[j] * data->magazines[MAGAZINE_NUMBER].product_cost[j];
@@ -216,17 +208,15 @@ int main(int argc, char* argv[]) {
     }
 
     semop(semid, &memory_lock, 1);
-
     data->magazines[MAGAZINE_NUMBER].magazine_active = 0;
 
     printf("\n======================================================\n");
-    printf("Stan magazynu %d:\n", MAGAZINE_NUMBER);
+    printf("Warehouse %d status:\n", MAGAZINE_NUMBER);
     for (int i = 0; i < PRODUCT; i++) {
-        printf("Produkt %c: %d\n", (char)('A' + i), data->magazines[MAGAZINE_NUMBER].product_number[i]);
+        printf("Product %c: %d\n", (char)('A' + i), data->magazines[MAGAZINE_NUMBER].product_number[i]);
     }
     printf("Gold: %d\n", data->magazines[MAGAZINE_NUMBER].magazine_gold);
     printf("======================================================\n\n");
-
     semop(semid, &memory_unlock, 1);
 
     shmdt(data);

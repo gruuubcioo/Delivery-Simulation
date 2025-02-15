@@ -52,12 +52,12 @@ struct msgbuf {
 int main(int argc, char* argv[]) {
 
     if (argc != 6) {
-        printf("Niepoprawna liczba argumentow\n");
+        printf("Invalid argument number\n");
         exit(1);
     }
     for (int i = 1; i < 6; i++) {
         if (atoi(argv[i]) <= 0) {
-            printf("Podaj liczbe dodatnią całkowitą\n");
+            printf("Enter a positive integer\n");
             exit(1);
         }
     }
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
         message.order.order_number = i;
 
         msgsnd(msgid, &message, sizeof(struct order_info), 0);
-        printf("Zlecono zlecenie numer %d, na %dxA, %dxB, %dxC\n", i, a, b, c);
+        printf("Order number %d, for %dxA, %dxB, %dxC was placed\n", i, a, b, c);
     }
 
     int mag_active = 0;
@@ -124,18 +124,18 @@ int main(int argc, char* argv[]) {
     }
 
     printf("\n======================================================\n");
-    printf("Stan dyspozytorni:\n");
+    printf("Control room status:\n");
     printf("Gold: %d\n", data->ctrl_room.control_room_gold);
     printf("======================================================\n\n");
 
     msgctl(msgid, IPC_RMID, NULL);
-    printf("Kolejka usunieta\n");
+    printf("Queue removed\n");
     shmdt(data);
     printf("Memory detached\n");
     shmctl(shmid, IPC_RMID, NULL);
     printf("Memory marked to delete\n");
     semctl(semid, 0, IPC_RMID);
-    printf("Semafor usunięty\n");
+    printf("Semaphore removed\n");
 
     return 0;
 }
